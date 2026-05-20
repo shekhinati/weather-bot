@@ -1,16 +1,21 @@
 import os
+import time
 import threading
 import requests
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 from flask import Flask
 
-# ===== ВСТАВЬ СВОИ ДАННЫЕ =====
-TOKEN = '8843918701:AAGUxTkjFTTu2YG_-VO2k7Fbo98S8JYTZwU'
-WEATHER_API_KEY = '223e7a7c7f4e761f1243d8faddb8f676'
-# ===============================
+# ===== ТОКЕН И КЛЮЧ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ =====
+TOKEN = os.environ.get('TOKEN')
+WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
+# =================================================
 
-# Создаём Flask-приложение для веб-сервера
+if not TOKEN:
+    print("❌ Ошибка: переменная TOKEN не задана!")
+if not WEATHER_API_KEY:
+    print("❌ Ошибка: переменная WEATHER_API_KEY не задана!")
+
 app = Flask(__name__)
 
 @app.route('/')
@@ -21,7 +26,6 @@ def home():
 def health():
     return "OK", 200
 
-# Функция погоды (та же самая)
 def get_weather(city_name: str) -> str:
     url = f'http://api.openweathermap.org/data/2.5/weather?q={city_name}&appid={WEATHER_API_KEY}&units=metric&lang=ru'
     
@@ -42,7 +46,6 @@ def get_weather(city_name: str) -> str:
     except Exception as e:
         return f"⚠️ Ошибка: {e}"
 
-# Обработчик сообщений Telegram
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     city = update.message.text.strip()
     await update.message.reply_text(f"🔍 Смотрю погоду в {city}...")
@@ -50,20 +53,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     weather_info = get_weather(city)
     await update.message.reply_text(weather_info)
 
-# Функция для запуска Telegram-бота в отдельном потоке
 def run_telegram_bot():
+    """Запускает Telegram-бота в отдельном потоке"""
+    print("🤖 Запуск Telegram-бота...")
     telegram_app = Application.builder().token(TOKEN).build()
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 Telegram-бот запущен")
+    print("✅ Telegram-бот успешно запущен и слушает сообщения")
     telegram_app.run_polling()
 
-# Запуск всего вместе
 if __name__ == '__main__':
     # Запускаем Telegram-бота в фоновом потоке
     bot_thread = threading.Thread(target=run_telegram_bot)
+    bot_thread.daemon = True  # Поток завершится вместе с основным процессом
     bot_thread.start()
     
-    # Запускаем Flask-сервер для Render (слушаем порт)
+    # Даём потоку время на инициализацию (важно для Render)
+    time.sleep(2)
+    
+    # Запускаем Flask-сервер для Render
     port = int(os.environ.get("PORT", 5000))
     print(f"🌐 Веб-сервер запущен на порту {port}")
     app.run(host="0.0.0.0", port=port)
