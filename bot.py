@@ -1,17 +1,21 @@
+import os
 import requests
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
+# Токены из переменных окружения
+TOKEN = os.getenv('TELEGRAM_TOKEN')
+WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
 
-TOKEN = '8843918701:AAGUxTkjFTTu2YG_-VO2k7Fbo98S8JYTZwU'
-WEATHER_API_KEY = '223e7a7c7f4e761f1243d8faddb8f676'
-
+# Проверка при запуске
+if not TOKEN or not WEATHER_API_KEY:
+    raise ValueError("❌ Задайте переменные TELEGRAM_TOKEN и WEATHER_API_KEY")
 
 def get_weather(city_name: str) -> str:
     url = f'http://api.openweathermap.org/data/2.5/weather?q={city_name}&appid={WEATHER_API_KEY}&units=metric&lang=ru'
     
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         data = response.json()
         
         if data.get('cod') == 200:
@@ -30,15 +34,15 @@ def get_weather(city_name: str) -> str:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     city = update.message.text.strip()
     await update.message.reply_text(f"🔍 Смотрю погоду в {city}...")
-    
     weather_info = get_weather(city)
     await update.message.reply_text(weather_info)
 
-def main():
+def run_bot():
+    """Запуск бота (будет вызван из app.py)"""
     app = Application.builder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print('☁️ Бот погоды запущен. Напиши название города.')
+    print('☁️ Бот погоды запущен и слушает сообщения')
     app.run_polling()
 
 if __name__ == '__main__':
-    main()
+    run_bot()
